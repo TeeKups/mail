@@ -1,12 +1,12 @@
 #!/bin/sh
 
+$domain="$(cat /etc/mailname)"
 echo "Make sure to change /etc/mailname to correct domain prior to running."
-echo "Currently $(cat /etc/mailname)"
+echo "Currently $domain"
 
 echo "Program will continue in 5 seconds. Pres Ctrl+C to cancel."
 sleep 5
 
-$domain="$(cat /etc/mailname)"
 
 # Install deps
 apt update && apt upgrade -y
@@ -31,7 +31,7 @@ cat postgresql/pg_hba.conf > /etc/postgresql/12/main/pg_hba.conf
 sudo -u postgres psql -f postgresql/config-1.psql
 echo "Pick a password for admin@$domain."
 read -p "Enter password: " adminpwd
-adminpwdhash=$(doveadm pw -S PBKDF2 -p $admimnpwd)
+adminpwdhash=$(doveadm pw -s PBKDF2 -p $admimnpwd)
 pscmd="$(sed -e "s/ADMINPWD/$adminpwdhash/" \
     -e "s/DOMAIN/$domain/" \
     -e "s/MAILREADER_GID/$mailreader_gid/")"
