@@ -1,0 +1,44 @@
+rewrite_header Subject [SPAM]
+report_safe 0
+required_score 5.0
+use_bayes 1
+bayes_auto_learn 1
+ifplugin Mail::SpamAssassin::Plugin::Shortcircuit
+#
+#   default: strongly-whitelisted mails are *really* whitelisted now, if the
+#   shortcircuiting plugin is active, causing early exit to save CPU load.
+#   Uncomment to turn this on
+#
+#   SpamAssassin tries hard not to launch DNS queries before priority -100.
+#   If you want to shortcircuit without launching unneeded queries, make
+#   sure such rule priority is below -100. These examples are already:
+#
+# shortcircuit USER_IN_WHITELIST       on
+# shortcircuit USER_IN_DEF_WHITELIST   on
+# shortcircuit USER_IN_ALL_SPAM_TO     on
+# shortcircuit SUBJECT_IN_WHITELIST    on
+
+#   the opposite; blacklisted mails can also save CPU
+#
+# shortcircuit USER_IN_BLACKLIST       on
+# shortcircuit USER_IN_BLACKLIST_TO    on
+# shortcircuit SUBJECT_IN_BLACKLIST    on
+
+#   if you have taken the time to correctly specify your trusted_networks,
+#   this is another good way to save CPU
+#
+# shortcircuit ALL_TRUSTED             on
+
+#   and a well-trained bayes DB can save running rules, too
+#
+# shortcircuit BAYES_99                spam
+# shortcircuit BAYES_00                ham
+
+endif # Mail::SpamAssassin::Plugin::Shortcircuit
+
+# user additions
+skip_rbl_checks 0
+use_razor2      0
+#use_dcc          0
+use_pyzor       0
+

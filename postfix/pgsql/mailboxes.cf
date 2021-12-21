@@ -1,0 +1,7 @@
+user=mailreader
+password=MAILREADERPWD
+dbname=mail
+table=users
+select_field=maildir
+where_field=email
+hosts=localhost

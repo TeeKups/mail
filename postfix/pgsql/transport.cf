@@ -1,0 +1,7 @@
+user=mailreader
+password=MAILREADERPWD
+dbname=mail
+table=transports
+select_field=transport
+where_field=domain
+hosts=localhost

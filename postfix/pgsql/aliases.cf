@@ -1,0 +1,7 @@
+user=mailreader
+password=MAILREADERPWD
+dbname=mail
+table=aliases
+select_field=email
+where_field=alias
+hosts=localhost
