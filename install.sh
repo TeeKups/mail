@@ -10,10 +10,9 @@ $domain="$(cat /etc/mailname)"
 
 # Install deps
 apt update && apt upgrade -y
-apt install postfix postfix-pgsql dovecot-imap dovecot-psql opendkim opendkim-tooks spamassassin spamc fail2ban certbot oistgresql -y
+apt install postfix postfix-pgsql dovecot-imap dovecot-psql dovecor sieve opendkim opendkim-tooks spamassassin spamc fail2ban certbot oistgresql -y
 
 
-# dovecot-sieve maybe not needed with sql
 
 # Make cert
 certbot --nginx certonly -d mail.$(echo DOMAIN)
@@ -49,12 +48,15 @@ echo "$POSTFIX_MAIN" > /etc/postfix/main.cf
 POSTFIX_MBOXES="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/mailboxes.cf)"
 POSTFIX_TANSPORT="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/transport.cf)"
 POSTFIX_MBOXES="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/mailboxes.cf)"
+echo '/^Received:.*with ESMTPSA/ IGNORE' > /etc/postix/header_checks
 
 # Dovecot
 doveadm pw -s PBKDS2
 mv /etc/dovecot/dovecot.conf /etc/dovecot/dovecot.conf.bk
-DOVECOT_CONF="$(sed "s/DOMAIN/$domain/g" dovecot/dovecot.conf)"
+DOVECOT_CONF="$(sed -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" dovecot/dovecot.conf)"
+DOVECOT_SQL_CONF="$(sed "s/MAILREADER_PWD/$mailreaderpwd/g")"
 echo "$DOVECOT_CONF" > /etc/dovecot.conf
+echo "$DOVECOT_SQL_CONF" > /etc/dovecot/dovecot-sql.conf.ext
 
 ## Dovecot-sieve
 mkdir /var/lib/dovecot/sieve/
