@@ -1,23 +1,15 @@
 #!/bin/sh
 
-$domain="$(cat /etc/mailname)"
-echo "Make sure to change /etc/mailname to correct domain prior to running."
-echo "Currently $domain"
+read -p "Enter domain name: " domain
 
-echo "Program will continue in 5 seconds. Pres Ctrl+C to cancel."
-sleep 5
-
-
-# Install deps
-apt update && apt upgrade -y
-apt install postfix postfix-pgsql dovecot-imap dovecot-psql dovecor sieve opendkim opendkim-tooks spamassassin spamc fail2ban certbot oistgresql -y
-
-
+# Install dependencies
+apt install postfix postfix-pgsql dovecot-imapd dovecot-lmtpd dovecot-pgsql dovecot-sieve opendkim opendkim-tools spamassassin spamc fail2ban python3-certbot-nginx postgresql -y
 
 # Make cert
-certbot --nginx certonly -d mail.$(echo DOMAIN)
+certbot certonly -d mail.$domain
 
 # PostgreSQL
+echo "Configuring PostgreSQL"
 groupadd mailreader
 echo "Pick a password for mailreader -user."
 read -p "Enter password: " mailreaderpwd
@@ -26,49 +18,58 @@ useradd -g mailreader -d /home/mail -s /sbin/nologin mailreader -p $mailreaderpw
 mailreader_gid=$(grep 'mailreader' /etc/passwd | cut -d':' -f3)
 mkdir /home/mail
 chown mailreader:mailreader /home/mail
-cat postgresql/pg_hba.conf > /etc/postgresql/12/main/pg_hba.conf
+cat postgresql/pg_hba.conf > /etc/postgresql/13/main/pg_hba.conf
 /etc/init.d/postgresql reload
-sudo -u postgres psql -f postgresql/config-1.psql
+#sudo -u postgres psql -a -c "$(cat postgresql/config-1.psql)"
+#sudo -u postgres psql -f postgresql/config-1.psql
+while read line; do
+	sudo -u postgres psql -c "$line"
+done <postgresql/config-1.psql
 echo "Pick a password for admin@$domain."
 read -p "Enter password: " adminpwd
-adminpwdhash=$(doveadm pw -s PBKDF2 -p $admimnpwd)
-pscmd="$(sed -e "s/ADMINPWD/$adminpwdhash/" \
-    -e "s/DOMAIN/$domain/" \
-    -e "s/MAILREADER_GID/$mailreader_gid/")"
-psql -d mail -U mailreader_admin -W -c "$pscmd"
-
+adminpwdhash=$(doveadm pw -s PBKDF2 -p $adminpwd)
+cp postgresql/config-2.psql postgresql/config-2.psql.tmp
+sed -i -e s/ADMINPWD/$adminpwdhash/g -e s/DOMAIN/$domain/g -e s/MAILREADER_GID/$mailreader_gid/g postgresql/config-2.psql.tmp
+psql -d mail -U mailreader_admin -f postgresql/config-2.psql.tmp
+rm postgresql/config-2.psql.tmp
 
 # Postfix
+echo "Configuring Postfix"
 mv /etc/postfix/master.cf /etc/postfix/master.cf.bk
 mv /etc/postfix/main.cf /etc/postfix/main.cf.bk
-POSTFIX_MASTER="$(cat postfix/master.cf)"
-POSTFIX_MAIN="$(sed -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" postfix/main.cf)"
-echo "$POSTFIX_MASTER" > /etc/postfix/master.cf
-echo "$POSTFIX_MAIN" > /etc/postfix/main.cf
-POSTFIX_MBOXES="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/mailboxes.cf)"
-POSTFIX_TANSPORT="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/transport.cf)"
-POSTFIX_MBOXES="$(sed "s/MAILREADERPWD/$mailreaderpwd/" postfix/pgsql/mailboxes.cf)"
-echo '/^Received:.*with ESMTPSA/ IGNORE' > /etc/postix/header_checks
+cp postfix/master.cf /etc/postfix/master.cf
+cp postfix/main.cf /etc/postfix/main.cf
+sed -i -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" /etc/postfix/main.cf
+[ -d /etc/postfix/pgsql ] || mkdir /etc/postfix/pgsql
+cp postfix/psql/mailboxes.cf /etc/postfix/psql/mailboxes.cf
+cp postfix/psql/transport.scf /etc/postfix/psql/transport.cf
+cp postfix/psql/aliases.cf /etc/postfix/psql/aliases.cf
+sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/mailboxes.cf
+sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/transport.cf
+sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/aliases.cf
+echo '/^Received:.*with ESMTPSA/ IGNORE' > /etc/postfix/header_checks
 
 # Dovecot
-doveadm pw -s PBKDS2
-mv /etc/dovecot/dovecot.conf /etc/dovecot/dovecot.conf.bk
-DOVECOT_CONF="$(sed -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" dovecot/dovecot.conf)"
-DOVECOT_SQL_CONF="$(sed "s/MAILREADER_PWD/$mailreaderpwd/g")"
-echo "$DOVECOT_CONF" > /etc/dovecot.conf
-echo "$DOVECOT_SQL_CONF" > /etc/dovecot/dovecot-sql.conf.ext
+echo "Configuring Dovecot"
+#doveadm pw -s PBKDS2
+[ -f /etc/dovecot/dovecot.conf ] && mv /etc/dovecot/dovecot.conf /etc/dovecot/dovecot.conf.bk
+cp dovecot/dovecot.conf /etc/dovecot/dovecot.conf
+sed -i -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" /etc/dovecot/dovecot.conf
+cp dovecot/dovecot-sql.conf.ext /etc/dovecot/dovecot-sql.conf.ext
+sed -i "s/MAILREADER_PWD/$mailreaderpwd/g" /etc/dovecot/dovecot-sql.conf.ext
 
 ## Dovecot-sieve
-mkdir /var/lib/dovecot/sieve/
+echo "Configuring Dovecot-sieve"
+[ -d /var/lib/dovecot/sieve ] || mkdir /var/lib/dovecot/sieve
 echo "require [\"fileinto\", \"mailbox\"];
 if header :contains \"X-Spam-Flag\" \"YES\"
     {
         fileinto \"Junk\";
     }
 
-if header :contains "subject" ["[SPAM]"]
+if header :contains \"subject\" [\"[SPAM]\"]
 {
-    fileinto "Junk";
+    fileinto \"Junk\";
     stop;
 }
 else
@@ -84,6 +85,7 @@ echo "auth required pam_unix.so nullok
 account required pam_unix.so" >> /etc/pam.d/dovecot
 
 # OpenDKIM
+echo "Configuring OpenDKIM"
 OPENDKIM_CONF="$(sed s/DOMAIN/$domain/g opendkim/opendkim.conf)"
 echo "$OPENDKIM_CONF" > /etc/opendkim.conf
 
@@ -98,7 +100,7 @@ grep -q "$domain" /etc/postfix/dkim/signingtable 2>/dev/null ||
     echo "*@$domain mail._domainkey.$domain" > /etc/postfix/dkim/signingtable
 
 grep -q "$domain" /etc/postfix/dkim/keytable 2>/dev/null ||
-    echo "mail._domainkey.$domain $domain:mail:/etc/postfix/dkim/mail.private" >> /etc/opendkim/keytable
+    echo "mail._domainkey.$domain $domain:mail:/etc/postfix/dkim/mail.private" >> /etc/postfix/dkim/keytable
 
 grep -q "127.0.0.1" /etc/postfix/dkim/trustedhosts 2>/dev/null ||
 	echo "127.0.0.1
@@ -115,6 +117,7 @@ cat spamassassin/local.cf > /etc/spamassassin/local.cf
 cat fail2ban/jail.local > /etc/fail2ban/jail.local
 
 # (re)run all programs
+echo "Restarting programs..."
 for x in spamassassin opendkim dovecot postfix fail2ban; do
 	printf "Restarting %s..." "$x"
 	service "$x" restart && printf " ...done\\n"
@@ -129,8 +132,6 @@ mkdir "$HOME"/.config 2>/dev/null
 echo "$dkimentry
 $dmarcentry
 $spfentry" > "$HOME"/.config/dkim
-
-useradd -m -G mail dmarc
 
 # Info
 echo "Email has been configured for subdomain mail.$domain."

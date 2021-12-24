@@ -1,52 +1,8 @@
-CREATE TABLE users (
-    email TEXT PRIMARY KEY,
-    password TEXT NOT NULL,
-    realname TEXT,
-    maildir TEXT NOT NULL,
-    created TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
-INSERT INTO users (
-    email,
-    password,
-    realname,
-    maildir
-) VALUES (
-    'admin@DOMAIN',
-    '{PBKDF2}ADMINPWD',
-    'Administrator',
-    'admin/'
-);
-
-CREATE TABLE transports (
-    domain TEXT PRIMARY KEY,
-    gid INTEGER UNIQUE NOT NULL,
-    transport TEXT NOT NULL
-);
-
-INSERT INTO transports (
-    domain,
-    gid,
-    transport
-) VALUES (
-    'DOMAIN',
-    MAILREADER_GID,
-    'virtual:'
-);
-
-CREATE TABLE aliases (
-    alias TEXT PRIMARY KEY,
-    email TEXT NOT NULL
-);
-
-INSERT INTO aliases (
-    alias,
-    email
-) VALUES (
-    'dmarc@DOMAIN',
-    'admin@DOMAIN'
-);
-
+CREATE TABLE users ( email TEXT PRIMARY KEY, password TEXT NOT NULL, realname TEXT, maildir TEXT NOT NULL, created TIMESTAMP WITH TIME ZONE DEFAULT now() );
+INSERT INTO users ( email, password, realname, maildir ) VALUES ( 'admin@DOMAIN', 'ADMINPWD', 'Administrator', 'admin/' );
+CREATE TABLE transports ( domain TEXT PRIMARY KEY, gid INTEGER UNIQUE NOT NULL, transport TEXT NOT NULL );
+INSERT INTO transports ( domain, gid, transport ) VALUES ( 'DOMAIN', MAILREADER_GID, 'virtual:' );
+CREATE TABLE aliases ( alias TEXT PRIMARY KEY, email TEXT NOT NULL );
+INSERT INTO aliases ( alias, email ) VALUES ( 'dmarc@DOMAIN', 'admin@DOMAIN' );
 GRANT USAGE ON SCHEMA public TO mailreader;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO Mḿailreader;
-
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO mailreader;

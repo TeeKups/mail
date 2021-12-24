@@ -91,7 +91,7 @@ mailman   unix  -       n       n       -       -       pipe
   ${nexthop} ${user}
 
 smtp    unix    -       -       n       -       -       smtp
-smtp    inet    n       -       n       -       -       smtpd
+smtp    inet    n       -       y       -       -       smtpd
   -o content_filter=spamassassin
 
 submission      inet    n       -       n       -       -       smtpd

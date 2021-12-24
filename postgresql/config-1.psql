@@ -1,11 +1,11 @@
 CREATE USER mailreader;
-\echo Create password for user mailreader
-\password mailreader
-CREATE USER mailreader_admin;
-\echo Create password for user mailreader_admin
-\password mailreader_admin
+\\echo 'PostgreSQL: Pick a password for mailreader'
+\\password mailreader
+CREATE USER mailreader_admin
+\\echo 'PostgreSQL: Pick a password for mailreader_admin';
+\\password mailreader_admin
 CREATE DATABASE mail WITH OWNER mailreader_admin;
-\c mail
+\\c mail
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE USAGE ON SCHEMA public FROM PUBLIC;
 GRANT CREATE ON SCHEMA public TO mailreader_admin;
