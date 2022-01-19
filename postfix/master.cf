@@ -9,7 +9,7 @@
 #               (yes)   (yes)   (no)    (never) (100)
 # ==========================================================================
 pickup    unix  n       -       y       60      1       pickup
-cleanup   unix  n       -       y       -       0       cleanup
+#cleanup   unix  n       -       y       -       0       cleanup
 qmgr      unix  n       -       n       300     1       qmgr
 tlsmgr    unix  -       -       y       1000?   1       tlsmgr
 rewrite   unix  -       -       y       -       -       trivial-rewrite
@@ -114,7 +114,7 @@ relay   unix    -       -       y       -       -       smtp
   -o syslog_name=postfix/$service_name
 
 spamassassin  unix  - n n - - pipe
-  flags=R user=spamd argv=/usr/bin/spamc -f -e /usr/sbin/sendmail -oi -f ${sender} ${recipient}
+  flags=R user=debian-spamd argv=/usr/bin/spamc -f -e /usr/sbin/sendmail -oi -f ${sender} ${recipient}
 
 dovecot unix  - n n - - pipe
   flags=DRhu user=vmail:vmail argv=/usr/lib/dovecot/dovecot-lda -f ${sender} -d ${recipient}

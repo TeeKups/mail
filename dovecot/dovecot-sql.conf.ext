@@ -1,4 +1,4 @@
 driver = pgsql
 connect = host=localhost dbname=mail user=mailreader password=MAILREADER_PWD
 default_pass_scheme = PBKDF2
-password_query = SELECT email as user, password, 'maildir:/home/mail/'||maildir as userdb_mail FROM users where email - '%u'
+password_query = SELECT email as user, password, 'maildir:/home/mail/'||maildir as userdb_mail FROM users where email = '%u'

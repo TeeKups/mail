@@ -1,9 +1,5 @@
-CREATE USER mailreader;
-\\echo 'PostgreSQL: Pick a password for mailreader'
-\\password mailreader
-CREATE USER mailreader_admin
-\\echo 'PostgreSQL: Pick a password for mailreader_admin';
-\\password mailreader_admin
+CREATE USER mailreader PASSWORD 'MAILREADERPWD';
+CREATE USER mailreader_admin PASSWORD 'ADMINPWD';
 CREATE DATABASE mail WITH OWNER mailreader_admin;
 \\c mail
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;

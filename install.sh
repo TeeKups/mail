@@ -1,6 +1,29 @@
 #!/bin/sh
 
 read -p "Enter domain name: " domain
+read -p "Enter mail subdomain name (e.g. mail-dom.tld -> mail): " subdom
+
+read_pwd()
+{
+	read -s -p "Enter pwd: " pass 
+	echo ''
+	read -s -p "Enter pwd again: " pass2
+
+	if [ $pass != $pass2 ]; then
+		echo 'The passwords didnt match! Try again.'
+	       	read_pwd
+	else
+		mailreader_adminpwd=$pass
+	fi
+}
+
+
+echo "Pick a password for SQL user mailreader_admin."
+read_pwd
+
+mailreaderpwd=$(tr -dc A-Za-z0-9 </dev/urandom | head -c13 ; echo '')
+
+echo $domain > /etc/hostname
 
 # Install dependencies
 apt install postfix postfix-pgsql dovecot-imapd dovecot-lmtpd dovecot-pgsql dovecot-sieve opendkim opendkim-tools spamassassin spamc fail2ban python3-certbot-nginx postgresql -y
@@ -11,8 +34,6 @@ certbot certonly -d mail.$domain
 # PostgreSQL
 echo "Configuring PostgreSQL"
 groupadd mailreader
-echo "Pick a password for mailreader -user."
-read -p "Enter password: " mailreaderpwd
 mailreaderpwdhash=$(mkpasswd $mailreaderpwd)
 useradd -g mailreader -d /home/mail -s /sbin/nologin mailreader -p $mailreaderpwdhash
 mailreader_gid=$(grep 'mailreader' /etc/passwd | cut -d':' -f3)
@@ -20,11 +41,9 @@ mkdir /home/mail
 chown mailreader:mailreader /home/mail
 cat postgresql/pg_hba.conf > /etc/postgresql/13/main/pg_hba.conf
 /etc/init.d/postgresql reload
-#sudo -u postgres psql -a -c "$(cat postgresql/config-1.psql)"
-#sudo -u postgres psql -f postgresql/config-1.psql
 while read line; do
 	sudo -u postgres psql -c "$line"
-done <postgresql/config-1.psql
+done <<<"$(sed -e s/ADMINPWD/$mailreader_adminpwd/ -e s/MAILREADERPWD/$mailreaderpwd/ postgresql/config-1.psql)"
 echo "Pick a password for admin@$domain."
 read -p "Enter password: " adminpwd
 adminpwdhash=$(doveadm pw -s PBKDF2 -p $adminpwd)
@@ -41,9 +60,9 @@ cp postfix/master.cf /etc/postfix/master.cf
 cp postfix/main.cf /etc/postfix/main.cf
 sed -i -e "s/DOMAIN/$domain/g" -e "s/MAILREADER_GID/$mailreader_gid/g" /etc/postfix/main.cf
 [ -d /etc/postfix/pgsql ] || mkdir /etc/postfix/pgsql
-cp postfix/psql/mailboxes.cf /etc/postfix/psql/mailboxes.cf
-cp postfix/psql/transport.scf /etc/postfix/psql/transport.cf
-cp postfix/psql/aliases.cf /etc/postfix/psql/aliases.cf
+cp postfix/pgsql/mailboxes.cf /etc/postfix/pgsql/mailboxes.cf
+cp postfix/pgsql/transport.cf /etc/postfix/pgsql/transport.cf
+cp postfix/pgsql/aliases.cf /etc/postfix/pgsql/aliases.cf
 sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/mailboxes.cf
 sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/transport.cf
 sed -i "s/MAILREADERPWD/$mailreaderpwd/" /etc/postfix/pgsql/aliases.cf
@@ -91,7 +110,7 @@ echo "$OPENDKIM_CONF" > /etc/opendkim.conf
 
 ## OpenDKIM keys
 mkdir -p /etc/postfix/dkim
-opendkim-genkey -D /etc/postfix/dkim/ -d $domain -s mail
+opendkim-genkey -D /etc/postfix/dkim/ -d $domain -s $subdom
 chgrp opendkim /etc/postfix/dkim/*
 chmod g+r /etc/postfix/dkim/*
 
@@ -125,7 +144,7 @@ done
 
 pval="$(tr -d "\n" </etc/postfix/dkim/$subdom.txt | sed "s/k=rsa.* \"p=/k=rsa; p=/;s/\"\s*\"//;s/\"\s*).*//" | grep -o "p=.*")"
 dkimentry="$subdom._domainkey.$domain	TXT	v=DKIM1; k=rsa; $pval"
-dmarcentry="_dmarc.$domain	TXT	v=DMARC1; p=reject; rua=mailto:dmarc@$domain; fo=1"
+dmarcentry="_dmarc.$domain	TXT	v=DMARC1; p=quarantine; rua=mailto:dmarc@$domain; fo=1"
 spfentry="@	TXT	v=spf1 mx a:mail.$domain -all"
 
 mkdir "$HOME"/.config 2>/dev/null
